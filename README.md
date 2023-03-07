@@ -1,2 +1,6 @@
-# python-finance-tools
- Python tools for financial modeling
+# Python Finance Tools
+Python tools for financial modeling
+
+# Stocks
+
+# Options
