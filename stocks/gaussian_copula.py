@@ -58,17 +58,8 @@ class stock():
 		print("mean annual gain (%):", np.round(((self.price[-1]/self.price[0])**(365/len(self.price))-1)*100, 2), '\n')
 
 
-N = 3*365
-X = np.arange(0,N)
-Stock = stock(init_price=95.74, mu=0.00167593, sigma=1.89649152648)
-Stock.propegate(N-1)
-Stock.summary()
-
-plt.plot(X, Stock.price)
-plt.show()
 
 
-"""
 #example with a bundle of covariant stocks:
 if __name__ == '__main__':
 	N = 3*365
@@ -110,4 +101,3 @@ if __name__ == '__main__':
 			ax2.plot(X, Portfolio, color=(color, color,color), linewidth=1)
 
 	plt.show()
-"""
