@@ -15,7 +15,7 @@ class MG():
 	def covar(Id, dictionary=False):
 		if not dictionary:
 			C = np.copy(MG.cov_mat[Id])
-			C[Id] = 0
+			#C[Id] = 0
 			return C
 		else:
 			C = MG.cov_mat[Id]
@@ -78,11 +78,13 @@ class MG():
 
 	def __add__(self, MG2):
 		if isinstance(MG2, MG):
-
+			cov1 = MG.covar(self.id)
+			cov2 = MG.covar(MG2.id)
 
 			return MG(state=self.state + MG2.state,
 					  mu=self.mu + MG2.mu,
-					  sigma=np.sqrt(self.sigma**2 + MG2.sigma**2 + 2*MG.cov_mat[self.id, MG2.id]))
+					  sigma=np.sqrt(self.sigma**2 + MG2.sigma**2 + 2*MG.cov_mat[self.id, MG2.id]),
+					  cov=cov1+cov2)
 
 		elif isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
@@ -111,11 +113,13 @@ class MG():
 
 	def __sub__(self, MG2):
 		if isinstance(MG2, MG):
+			cov1 = MG.covar(self.id)
+			cov2 = MG.covar(MG2.id)
 
-
-			return MG(state=self.state + MG.state,
+			return MG(state=self.state - MG2.state,
 					  mu=self.mu - MG2.mu,
-					  sigma=np.sqrt(self.sigma**2 + MG2.sigma**2 - 2*MG.cov_mat[self.id, MG2.id]))
+					  sigma=np.sqrt(self.sigma**2 + MG2.sigma**2 - 2*MG.cov_mat[self.id, MG2.id]),
+					  cov=cov1-cov2)
 
 		elif isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
@@ -149,7 +153,8 @@ class MG():
 		elif isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
 
-			return MG(mu=x*self.mu,
+			return MG(state=x*self.state,
+					  mu=x*self.mu,
 					  sigma=np.abs(x)*self.sigma,
 					  cov=x*MG.covar(self.id))
 
@@ -161,7 +166,8 @@ class MG():
 		if isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
 
-			return MG(mu=x*self.mu,
+			return MG(state=x*self.state,
+					  mu=x*self.mu,
 					  sigma=np.abs(x)*self.sigma,
 					  cov=x*MG.covar(self.id))
 
@@ -174,7 +180,7 @@ S1 = MG(state=0, mu=0, sigma=0.1)
 S2 = MG(state=0, mu=0, sigma=0.2, cov={S1.id:0.015})
 print(MG.cov_mat)
 
-S3 = S2+1
+S3 = 2*S2 - S2 #S2+S2
 print(S3)
 
 print(MG.cov_mat)
