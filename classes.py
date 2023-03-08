@@ -75,7 +75,7 @@ class MG():
 		cov = dict(enumerate(MG.cov_mat[self.id]))
 		cov.pop(self.id)
 
-		return 'id: '+str(self.id)+'  state: '+str(self.state)+'  mu: '+str(self.mu)+'  sigma: '+str(self.sigma)+'  cov: '+str(cov)
+		return 'id: '+str(self.id)+', state: '+str(self.state)+', mu: '+str(self.mu)+', sigma: '+str(self.sigma)+', cov: '+str(cov)
 
 
 	def __add__(self, MG2):
@@ -148,7 +148,14 @@ class MG():
 			raise TypeError
 
 
+	#TODO: implement MG*MG multiplication
 	def __mul__(self, MG2):
+		#https://stats.stackexchange.com/questions/15978/variance-of-product-of-dependent-variables
+		#https://math.stackexchange.com/questions/2926888/find-operatornamecovx2-y2
+		#https://stats.stackexchange.com/questions/352110/prove-that-textcorrx2-y2-rho2-where-x-y-are-jointly-n0-1-variab
+		#https://mathhelpforum.com/t/how-to-get-the-covariance-of-x-and-x-cov-x-x.182125/
+
+
 		if isinstance(MG2, MG):
 			raise NotImplementedError
 
@@ -252,12 +259,12 @@ if __name__ == '__main__':
 
 
 	S1 = MG(state=0, mu=0.001, sigma=0.3)
-	S2 = MG(state=0, mu=0.005, sigma=0.4, cov={S1.id:0.035})
-	print(MG.cov_mat)
+	S2 = MG(state=2, mu=0.005, sigma=0.4, cov={S1.id:0.035})
+	#print(MG.cov_mat)
 
 
 	S = timeSeries((S1, S2, S2-S1))
-	print(MG.cov_mat)
+	#print(MG.cov_mat)
 
 
 	P, dP = S.propegate(N=150)
@@ -267,7 +274,6 @@ if __name__ == '__main__':
 	plt.plot(P[2], label='S2-S1', color='black')
 
 	plt.legend(), plt.show()
-
 
 
 

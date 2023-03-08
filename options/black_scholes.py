@@ -1,6 +1,7 @@
 import numpy as np
 
 #Boundary conditions
+#https://www.optiontradingtips.com/strategies/
 def boundsCall(t, S, K, r, t_max, S_max, **kwargs):
 	"""
 	Lower, upper and maturity boundaries for a call option.
@@ -42,6 +43,52 @@ def boundsButterfly(S, K, **kwargs):
 	matbound = np.minimum(np.maximum(S-K[0], 0), np.maximum(K[1]-S, 0))
 	return lbound, ubound, matbound
 
+def boundsStraddle(t, S, K, r, t_max, S_max, **kwargs):
+	"""
+	Lower, upper and maturity boundaries for a straddle option.
+	S = array of stock prices
+	K = Strike price(s)
+	"""
+	lbound = K
+	ubound = S_max - K*np.exp(-r*(t_max-t))
+	matbound = np.maximum(K-S, S-K)
+	return lbound, ubound, matbound
+
+def boundsStrangle(t, S, K, r, t_max, S_max, **kwargs):
+	"""
+	Lower, upper and maturity boundaries for a strangle option.
+	S = array of stock prices
+	K = Strike price(s)
+	"""
+	lbound = S_max - K[0]*np.exp(-r*(t_max-t))
+	ubound = S_max - K[1]*np.exp(-r*(t_max-t))
+	matbound = np.maximum(K[0]-S, np.maximum(S-K[1], 0))
+	return lbound, ubound, matbound
+
+def boundsCollar(S, K, **kwargs):
+	"""
+	Lower, upper and maturity boundaries for a collar option.
+	S = array of stock prices
+	K = Strike price(s)
+	"""
+	lbound = 0
+	ubound = K[1]-K[0]
+	matbound = np.minimum(np.maximum(S-K[0], 0), K[1]-K[0])
+	return lbound, ubound, matbound
+
+def boundsBackspread(t, S, K, r, t_max, S_max, **kwargs):
+	"""
+	Lower, upper and maturity boundaries for a backspread option.
+	S = array of stock prices
+	K = Strike price(s)
+	"""
+	lbound = K[0]
+	ubound = K[1]-K[0]
+	matbound = np.maximum(K[0]-S, np.minimum(S-K[0],K[1]-K[0]))
+	return lbound, ubound, matbound
+
+
+
 
 #Greeks
 def Delta(S, V):
@@ -78,14 +125,13 @@ def BlackScholes_Euro(r, K, sigma, t_max, S_max, N, M, bounds):
 	Calculates the option price according to the Black-Scholes PDE for European options, with the given parameters and boundary conditions.
 	r = risk-free interest rate
 	K = Strike price(s)
+	C = net credit per share (only for Backspread options)
 	sigma = Underlying volatity (stdev)
 	t_max = Time till maturity (in interest periods)
 	S_max = Maximum considered stock price (advised +4*sigma)
 	N = Number of time (t) samples
 	M = Number of stock price (S) samples
-	lbound = function for lower boundary condition V(0,t)
-	ubound = function for upper boundary condition V(S_max,t)
-	matbound = function for maturity condition V(S, t_max)
+	bounds = function boundary conditions V(0,t), V(S_max,t), V(S, t_max)
 	
 	returns: t = (N-array) array of time steps
 	returns: S = (M-array) array of stock prices
@@ -107,7 +153,6 @@ def BlackScholes_Euro(r, K, sigma, t_max, S_max, N, M, bounds):
 			V[i-1, j] = (dt*r*S[j]/dS)*(V[i,j+1]-V[i,j]) + (dt*sigma**2*S[j]**2)/(2*dS**2)*(V[i,j+1]+V[i,j-1]-2*V[i,j]) - dt*r*V[i,j] + V[i,j]
 
 	return t, S, V
-
 
 
 def BlackScholes_USA(r, K, sigma, t_max, S_max, N, M, bounds):
@@ -142,7 +187,7 @@ def BlackScholes_USA(r, K, sigma, t_max, S_max, N, M, bounds):
 
 #example with butterfly option
 if __name__ == '__main__':
-	t, S, V = BlackScholes_Euro(r=0.015, K=[20, 34], sigma=0.356, t_max=1.0, S_max=70, N=800, M=80, bounds=boundsButterfly)
+	t, S, V = BlackScholes_Euro(r=0.015, K=[20,40], sigma=0.356, t_max=2.0, S_max=70, N=1800, M=80, bounds=boundsBackspread)
 
 	import matplotlib.pyplot as plt
 	fig, (ax1, ax2) = plt.subplots(2, sharex=True)
@@ -155,13 +200,14 @@ if __name__ == '__main__':
 	ax2.legend(), plt.show()
 
 
+	#plot underlying greeks
 	plt.plot(S, V[0], label='V')
 	plt.plot(S[0:-1], Delta(S, V[0]), label=r'$\Delta$')
 	plt.plot(S[0:-2], Gamma(S, V[0]), label=r'$\Gamma$')
 	plt.axhline(0, linestyle='--', color='grey')
 	#plt.legend(), plt.show()
 
-
+	#plot time greeks
 	plt.plot(t, V[:,36], label='S='+str(np.round(S[36], 2)))
 	plt.plot(t[0:-1], Theta(t, V[:,36]), label=r'$\Theta$')
 	plt.axhline(0, linestyle='--', color='grey')
