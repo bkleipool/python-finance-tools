@@ -56,6 +56,13 @@ class MG():
 
 		return 'id: '+str(self.id)+'  mu: '+str(self.mu)+'  sigma: '+str(self.sigma)+'  cov: '+str(cov)
 
+	@staticmethod
+	def covar(Id, dictionary=False):
+		if not dictionary:
+			return np.delete(MG.cov_mat[Id], Id)
+		else:
+			return dict(enumerate(np.delete(MG.cov_mat[Id], Id)))
+
 
 	def __add__(self, MG2):
 		if isinstance(MG2, MG):
@@ -65,56 +72,92 @@ class MG():
 		elif isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
 			return MG(mu=self.mu + x,
-					  sigma=self.sigma)
+					  sigma=self.sigma,
+					  cov=MG.covar(self.id, dictionary=True))
+
+		else:
+			raise TypeError
 
 
 	def __radd__(self, MG2):
-		if isinstance(MG2, MG):
-			return MG(mu=self.mu + MG2.mu,
-					  sigma=np.sqrt(self.sigma**2 + MG2.sigma**2 + 2*MG.cov_mat[self.id, MG2.id]))
-
-		elif isinstance(MG2, int) or isinstance(MG2, float):
-			x = MG2
-			return MG(mu=self.mu + x,
-					  sigma=self.sigma)
-
-	##TODO: add __rsub__
-	def __sub__(self, MG2):
-		return MG(mu=self.mu - MG2.mu,
-				  sigma=np.sqrt(self.sigma**2 + MG2.sigma**2 - 2*MG.cov_mat[self.id, MG2.id]))
-
-
-	def __mul__(self, MG2):
 		if isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
 
-			cov = x*MG.cov_mat[self.id]
-			cov = np.delete(cov, self.id)
+			return MG(mu=self.mu + x,
+					  sigma=self.sigma,
+					  cov=MG.covar(self.id, dictionary=True))
+
+		else:
+			raise TypeError
+
+
+	def __sub__(self, MG2):
+		if isinstance(MG2, MG):
+			return MG(mu=self.mu - MG2.mu,
+					  sigma=np.sqrt(self.sigma**2 + MG2.sigma**2 - 2*MG.cov_mat[self.id, MG2.id]))
+
+		elif isinstance(MG2, int) or isinstance(MG2, float):
+			x = MG2
+
+			return MG(mu=self.mu - x,
+					  sigma=self.sigma,
+					  cov=MG.covar(self.id, dictionary=True))
+
+		else:
+			raise TypeError
+
+
+	def __rsub__(self, MG2):
+		if isinstance(MG2, int) or isinstance(MG2, float):
+			x = MG2
+			cov = MG.covar(self.id)
+
+			return MG(mu=x - self.mu,
+					  sigma=self.sigma,
+					  cov=dict(enumerate(-cov)))
+
+		else:
+			raise TypeError
+
+
+	def __mul__(self, MG2):
+		if isinstance(MG2, MG):
+			raise NotImplementedError
+
+		elif isinstance(MG2, int) or isinstance(MG2, float):
+			x = MG2
+			cov = x*MG.covar(self.id)
 
 			return MG(mu=x*self.mu,
-					  sigma=x*self.sigma,
+					  sigma=np.abs(x)*self.sigma,
 					  cov=dict(enumerate(cov)))
+
+		else:
+			raise TypeError
 
 
 	def __rmul__(self, MG2):
 		if isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
-
-			cov = x*MG.cov_mat[self.id]
-			cov = np.delete(cov, self.id)
+			cov = x*MG.covar(self.id)
 
 			return MG(mu=x*self.mu,
-					  sigma=x*self.sigma,
+					  sigma=np.abs(x)*self.sigma,
 					  cov=dict(enumerate(cov)))
+
+		else:
+			raise TypeError
+
+
 
 S1 = MG(mu=0, sigma=0.1)
 S2 = MG(mu=0, sigma=0.2, cov={S1.id:0.015})
 S3 = MG(mu=0, sigma=0.3)
-S4 = MG(mu=0, sigma=0.4, cov={S2.id:-0.025})
-print(MG.cov_mat)
+S4 = MG(mu=1, sigma=0.4, cov={S2.id:-0.025})
 
-S5 = -1*S4
-print(S4)
+
+S5 = S4*2
+print(S5)
 
 print(MG.cov_mat)
 
