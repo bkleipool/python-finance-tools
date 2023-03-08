@@ -10,27 +10,45 @@ class MG():
 	inst = number of MG instances
 	cov_mat = covariance matrix of all MG instances
 	"""
-	def __init__(self, mu, sigma, cov=None):
+
+	@staticmethod
+	def covar(Id, dictionary=False):
+		if not dictionary:
+			C = np.copy(MG.cov_mat[Id])
+			C[Id] = 0
+			return C
+		else:
+			C = MG.cov_mat[Id]
+			C[Id] = np.copy(MG.cov_mat[Id])
+			return dict(enumerate(C))
+
+	def __init__(self, state, mu, sigma, cov=None):
 		"""
+		state = initial state
 		mu = expected value per period
 		sigma = volatility per period (stdev)
 		id = unique identifier
-		cov = dict of covariances with other MG instances
+		cov = dict or array of covariances with other MG instances
 		"""
+		self.state = state
 		self.mu = mu
 		self.sigma = sigma
 		self.id = MG.inst
 
-		#convert covariance dict to array
-		if cov == None:
+		##TODO: check for cov entries out of range
+
+		#convert covariance dict to array is applicable
+		if not isinstance(cov, (list, np.ndarray, dict)):
 			cov = np.zeros(MG.inst)
-		else:
+
+		elif isinstance(cov, dict):
 			cov_dict = cov
 			cov = np.zeros(MG.inst)
 			for i,c in list(cov_dict.items()):
 				cov[i] = c
 
-		##TODO: check for cov entries out of range
+		elif len(cov) != self.id:
+			raise Exception("Nr. of covariance inputs does not match nr. of MG instances")
 
 		#extend covariance matrix and add entries
 		if len(MG.cov_mat) > 1:
@@ -38,7 +56,8 @@ class MG():
 			MG.cov_mat = np.vstack((MG.cov_mat, np.zeros(MG.inst+1)))
 			MG.cov_mat[self.id,self.id] = self.sigma**2
 			for i,c in enumerate(cov):
-				MG.cov_mat[self.id,i] = MG.cov_mat[i,self.id] = c
+				if i != self.id:
+					MG.cov_mat[self.id,i] = MG.cov_mat[i,self.id] = c
 
 		elif len(MG.cov_mat) == 1:
 			MG.cov_mat = np.append(MG.cov_mat, cov[0])
@@ -54,26 +73,24 @@ class MG():
 		cov = dict(enumerate(MG.cov_mat[self.id]))
 		cov.pop(self.id)
 
-		return 'id: '+str(self.id)+'  mu: '+str(self.mu)+'  sigma: '+str(self.sigma)+'  cov: '+str(cov)
-
-	@staticmethod
-	def covar(Id, dictionary=False):
-		if not dictionary:
-			return np.delete(MG.cov_mat[Id], Id)
-		else:
-			return dict(enumerate(np.delete(MG.cov_mat[Id], Id)))
+		return 'id: '+str(self.id)+'  state: '+str(self.state)+'  mu: '+str(self.mu)+'  sigma: '+str(self.sigma)+'  cov: '+str(cov)
 
 
 	def __add__(self, MG2):
 		if isinstance(MG2, MG):
-			return MG(mu=self.mu + MG2.mu,
+
+
+			return MG(state=self.state + MG2.state,
+					  mu=self.mu + MG2.mu,
 					  sigma=np.sqrt(self.sigma**2 + MG2.sigma**2 + 2*MG.cov_mat[self.id, MG2.id]))
 
 		elif isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
-			return MG(mu=self.mu + x,
+
+			return MG(state=self.state + x,
+					  mu=self.mu + x,
 					  sigma=self.sigma,
-					  cov=MG.covar(self.id, dictionary=True))
+					  cov=MG.covar(self.id))
 
 		else:
 			raise TypeError
@@ -82,10 +99,11 @@ class MG():
 	def __radd__(self, MG2):
 		if isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
-
-			return MG(mu=self.mu + x,
+			
+			return MG(state=self.state + x,
+					  mu=self.mu + x,
 					  sigma=self.sigma,
-					  cov=MG.covar(self.id, dictionary=True))
+					  cov=MG.covar(self.id))
 
 		else:
 			raise TypeError
@@ -93,15 +111,19 @@ class MG():
 
 	def __sub__(self, MG2):
 		if isinstance(MG2, MG):
-			return MG(mu=self.mu - MG2.mu,
+
+
+			return MG(state=self.state + MG.state,
+					  mu=self.mu - MG2.mu,
 					  sigma=np.sqrt(self.sigma**2 + MG2.sigma**2 - 2*MG.cov_mat[self.id, MG2.id]))
 
 		elif isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
 
-			return MG(mu=self.mu - x,
+			return MG(state=self.state - x,
+					  mu=self.mu - x,
 					  sigma=self.sigma,
-					  cov=MG.covar(self.id, dictionary=True))
+					  cov=MG.covar(self.id))
 
 		else:
 			raise TypeError
@@ -110,11 +132,11 @@ class MG():
 	def __rsub__(self, MG2):
 		if isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
-			cov = MG.covar(self.id)
 
-			return MG(mu=x - self.mu,
+			return MG(state=x - self.state,
+					  mu=x - self.mu,
 					  sigma=self.sigma,
-					  cov=dict(enumerate(-cov)))
+					  cov=-MG.covar(self.id))
 
 		else:
 			raise TypeError
@@ -126,11 +148,10 @@ class MG():
 
 		elif isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
-			cov = x*MG.covar(self.id)
 
 			return MG(mu=x*self.mu,
 					  sigma=np.abs(x)*self.sigma,
-					  cov=dict(enumerate(cov)))
+					  cov=x*MG.covar(self.id))
 
 		else:
 			raise TypeError
@@ -139,25 +160,22 @@ class MG():
 	def __rmul__(self, MG2):
 		if isinstance(MG2, int) or isinstance(MG2, float):
 			x = MG2
-			cov = x*MG.covar(self.id)
 
 			return MG(mu=x*self.mu,
 					  sigma=np.abs(x)*self.sigma,
-					  cov=dict(enumerate(cov)))
+					  cov=x*MG.covar(self.id))
 
 		else:
 			raise TypeError
 
 
 
-S1 = MG(mu=0, sigma=0.1)
-S2 = MG(mu=0, sigma=0.2, cov={S1.id:0.015})
-S3 = MG(mu=0, sigma=0.3)
-S4 = MG(mu=1, sigma=0.4, cov={S2.id:-0.025})
+S1 = MG(state=0, mu=0, sigma=0.1)
+S2 = MG(state=0, mu=0, sigma=0.2, cov={S1.id:0.015})
+print(MG.cov_mat)
 
-
-S5 = S4*2
-print(S5)
+S3 = S2+1
+print(S3)
 
 print(MG.cov_mat)
 
@@ -166,11 +184,10 @@ print(MG.cov_mat)
 
 
 
-#shit class
-class timeseries():
-	def __init__(self, init_state, propegator, **kwargs):
+class timeSeries():
+	def __init__(self, MGs, init_state=None):
 		"""
-		stateHist = history of states
+		MGs = MG objects that it simulates
 		deltaHist = history of differences of states
 		propegator = propegation function
 		params = dict of parameters for the propegator function
@@ -194,6 +211,6 @@ class option():
 		return
 
 
-S = timeseries(propegator=None, init_state=95.47, mu=0.00167593, sigma=1.1647)
+#S = timeSeries(propegator=None, init_state=95.47, mu=0.00167593, sigma=1.1647)
 
 
