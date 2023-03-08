@@ -13,8 +13,7 @@ class stockBundle():
 	def propegate(self, N=1):
 		self.price = np.zeros((len(self.initP),N+1))
 		self.deltaP = np.append(self.deltaP, np.random.multivariate_normal(self.mu, self.cov, N).T, axis=1)
-		for i in range(len(self.initP)):
-			self.price[i] = np.cumsum(self.deltaP[i]) + np.full(N+1, self.initP[i])
+		self.price = np.cumsum(self.deltaP, axis=1) + np.tile(self.initP, (N+1,1)).T
 
 	def movingAverage(self, index, w):
 		avg = np.convolve(self.price[index], np.ones(w), 'valid') / w
@@ -62,7 +61,7 @@ class stock():
 
 #example with a bundle of covariant stocks:
 if __name__ == '__main__':
-	N = 3*365
+	N = 300
 	X = np.arange(0,N)
 	Stocks = stockBundle(init_prices = [95.74, 149.46, 261.53],
 						 mu_vec = [0.00167593, 0.05834956, 0.08673436],
