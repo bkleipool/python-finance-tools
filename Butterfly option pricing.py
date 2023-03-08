@@ -1,23 +1,23 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from options.black_scholes import BlackScholes_Euro, boundsButterfly
+from options.black_scholes import BlackScholes_Euro, boundsCall, boundsPut, boundsButterfly
 from stocks.gaussian_copula import stock
 
 
 
 
 #stock
-N = int(12000/100)
+N = int(12000/120)
 X = np.arange(0,N)
 Stock = stock(init_price=75.74, mu=0.00167593, sigma=1.89649152648)
 Stock.propegate(N-1)
 Stock.summary()
 
 #option
-t, S, V = BlackScholes_Euro(r=0.015, K=[60, 80], sigma=0.29649152648, t_max=1.0, S_max=150, N=12000, M=100, bounds=boundsButterfly)
-V = np.delete(V, [i for i in range(len(t)) if i%100 != 0], axis=0)
-t = np.delete(t, [i for i in range(len(t)) if i%100 != 0])
+t, S, V = BlackScholes_Euro(r=0.015, K=80, sigma=0.29649152648, t_max=1.0, S_max=150, N=12000, M=100, bounds=boundsCall)
+V = np.delete(V, [i for i in range(len(t)) if i%120 != 0], axis=0)
+t = np.delete(t, [i for i in range(len(t)) if i%120 != 0])
 
 
 
@@ -38,9 +38,10 @@ V_prices = [V[i,j] for i,j in zip(range(len(t)), S_indices)]
 
 fig, (ax1, ax2) = plt.subplots(2, sharex=True)
 
-ax1.axhline(65, label='K1', linestyle='--', color='grey')
-ax1.axhline(80, label='K2', linestyle='--', color='grey')
+ax1.axhline(80, label='K1', linestyle='--', color='grey')
+#ax1.axhline(85, label='K2', linestyle='--', color='grey')
 ax1.plot(X, Stock.price, label='stock', color='black')
 
 ax2.plot(X, V_prices, label='option', color='red')
+plt.tight_layout()
 ax1.legend(), ax2.legend(), plt.show()

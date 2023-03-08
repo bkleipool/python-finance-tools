@@ -1,11 +1,12 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 #Martingale class
 class MG():
 	inst = 0
 	cov_mat = []
 	"""
-	Martingale class for simulating covariant securites.
+	Gaussian martingale class for simulating covariant securites.
 	This class stores all the variables needed for a monte-carlo simulation.
 	inst = number of MG instances
 	cov_mat = covariance matrix of all MG instances
@@ -175,41 +176,28 @@ class MG():
 			raise TypeError
 
 
-
-S1 = MG(state=0, mu=0, sigma=0.1)
-S2 = MG(state=0, mu=0, sigma=0.2, cov={S1.id:0.015})
-print(MG.cov_mat)
-
-S3 = 2*S2 - S2 #S2+S2
-print(S3)
-
-print(MG.cov_mat)
-
-
-
-
-
-
 class timeSeries():
 	def __init__(self, MGs, init_state=None):
 		"""
 		MGs = MG objects that it simulates
 		deltaHist = history of differences of states
 		propegator = propegation function
-		params = dict of parameters for the propegator function
-
 		"""
-		self.stateHist = np.array([init_state]) if type(init_state) != list else init_state 
-		self.deltaHist = np.array([0])
-		self.propegator = propegator
-		self.params = kwargs
+		self.MGs = MGs
+		self.init_state = [i.state for i in self.MGs] if init_state == None else init_state
+		self.ids = [i.id for i in self.MGs]
+		self.mu = [i.mu for i in self.MGs]
+		self.cov = MG.cov_mat[np.ix_(self.ids, self.ids)] #select rows & columns from MG.cov_mat
 
-		#print(self.params)
 
 	def propegate(self, N=1):
-		self.deltaHist = np.append(self.deltaHist, self.propegator(self.params, N))
-		self.stateHist = np.cumsum(self.deltaHist, axis=0) + self.initP
+		self.stateHist = np.zeros((len(self.init_state),N+1))
+		self.deltaHist = np.zeros((len(self.init_state),1))
 
+		self.deltaHist = np.append(self.deltaHist, np.random.multivariate_normal(self.mu, self.cov, N).T, axis=1)
+		self.stateHist = np.cumsum(self.deltaHist, axis=1) + np.tile(self.init_state, (N+1,1)).T
+
+		return self.stateHist, self.deltaHist
 
 
 class option():
@@ -217,6 +205,32 @@ class option():
 		return
 
 
-#S = timeSeries(propegator=None, init_state=95.47, mu=0.00167593, sigma=1.1647)
+
+if __name__ == '__main__':
+
+	S1 = MG(state=0, mu=0, sigma=0.3)
+	S2 = MG(state=0, mu=0, sigma=0.4, cov={S1.id:-0.035})
+	print(MG.cov_mat)
+
+
+	S = timeSeries((S1,S2, S1+2*S2))
+	print(MG.cov_mat)
+
+
+	P, dP = S.propegate(N=100)
+
+	"""
+	for i,p in enumerate(P):
+		plt.plot(p, label=str(i+1))
+	"""
+	plt.plot(P[2], label='sim')
+	plt.plot(P[0]+2*P[1], label='real')
+
+
+	plt.legend(), plt.show()
+
+
+
+
 
 
