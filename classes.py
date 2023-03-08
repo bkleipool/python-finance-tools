@@ -1,7 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
+from math import erf
 
-#Martingale class
+
+#Gaussian martingale class
 class MG():
 	inst = 0
 	cov_mat = []
@@ -176,6 +177,28 @@ class MG():
 			raise TypeError
 
 
+	def __neg__(self):
+		return MG(state=-self.state,
+				  mu=-self.mu,
+				  sigma=self.sigma,
+				  cov=-MG.covar(self.id))
+
+	#TODO: implement covariance
+	def __abs__(self):
+		#https://en.wikipedia.org/wiki/Folded_normal_distribution
+		#https://stats.stackexchange.com/questions/89899/variance-of-absolute-value-of-a-rv
+		#https://mathhelpforum.com/t/how-to-get-the-covariance-of-x-and-x-cov-x-x.182125/
+
+		mu_y = self.sigma*np.sqrt(2/np.pi) * np.exp(-self.mu**2/(2*self.sigma**2)) + self.mu*erf(self.mu/np.sqrt(2*self.sigma**2))
+		sigma_y = np.sqrt(self.mu**2 + self.sigma**2 - mu_y**2)
+
+		return MG(state = abs(self.state),
+				  mu = mu_y,
+				  sigma = sigma_y)
+				  #cov = MG.covar(self.id))
+
+
+#Time series class
 class timeSeries():
 	def __init__(self, MGs, init_state=None):
 		"""
@@ -200,32 +223,48 @@ class timeSeries():
 		return self.stateHist, self.deltaHist
 
 
+#option class
 class option():
-	def __init__(self, underlying, strike_price, exp_date):
-		return
+	def __init__(self, underlying, strike_price, risk_free_rate, t_max):
+		"""
+		und = underlying asset
+		K = strike price
+		r = risk-free interest rate
+		r_period = nr. of propegation steps per interest period
+		t_max = maturity date (in interest periods)
+		"""
+		self.K = strike_price
+		self.r = risk_free_rate
+		self.r_period = r_period
+		self.t_max = t_max
+
+		if isinstance(underlying, MG):
+			self.und = underlying
+		else:
+			raise Exception('Underlying must be of type MG')
+
+
 
 
 
 if __name__ == '__main__':
+	import matplotlib.pyplot as plt
 
-	S1 = MG(state=0, mu=0, sigma=0.3)
-	S2 = MG(state=0, mu=0, sigma=0.4, cov={S1.id:-0.035})
+
+	S1 = MG(state=0, mu=0.001, sigma=0.3)
+	S2 = MG(state=0, mu=0.005, sigma=0.4, cov={S1.id:0.035})
 	print(MG.cov_mat)
 
 
-	S = timeSeries((S1,S2, S1+2*S2))
+	S = timeSeries((S1, S2, S2-S1))
 	print(MG.cov_mat)
 
 
-	P, dP = S.propegate(N=100)
+	P, dP = S.propegate(N=150)
 
-	"""
-	for i,p in enumerate(P):
-		plt.plot(p, label=str(i+1))
-	"""
-	plt.plot(P[2], label='sim')
-	plt.plot(P[0]+2*P[1], label='real')
-
+	plt.plot(P[0], label='S1', linestyle='--')
+	plt.plot(P[1], label='S2', linestyle='--')
+	plt.plot(P[2], label='S2-S1', color='black')
 
 	plt.legend(), plt.show()
 
