@@ -234,6 +234,7 @@ class timeSeries():
 class option():
 	def __init__(self, underlying, strike_price, risk_free_rate, t_max):
 		"""
+		Instantiate option object
 		und = underlying asset
 		K = strike price
 		r = risk-free interest rate
@@ -249,6 +250,50 @@ class option():
 			self.und = underlying
 		else:
 			raise Exception('Underlying must be of type MG')
+
+
+	@classmethod
+	def BlackScholes_Euro(r, K, sigma, t_max, S_max, N, M, bounds):
+		"""
+		Calculates the option price according to the Black-Scholes PDE for European options, with the given parameters and boundary conditions.
+		r = risk-free interest rate
+		K = Strike price(s)
+		C = net credit per share (only for Backspread options)
+		sigma = Underlying volatity (stdev)
+		t_max = Time till maturity (in interest periods)
+		S_max = Maximum considered stock price (advised +4*sigma)
+		N = Number of time (t) samples
+		M = Number of stock price (S) samples
+		bounds = function boundary conditions V(0,t), V(S_max,t), V(S, t_max)
+		
+		returns: t = (N-array) array of time steps
+		returns: S = (M-array) array of stock prices
+		returns: V = (N*M matrix) array of option prices
+		"""
+
+		#setup domain & boundary conditions
+		t = np.linspace(0, t_max, N) 	#time range
+		S = np.linspace(0, S_max, M) 	#Stock price range
+		dt = max(t)/len(t) 				#t interval size
+		dS = max(S)/len(S) 				#S interval size
+
+		V = np.zeros((len(t),len(S)))
+		V[:,0], V[:,-1], V[-1] = bounds(t=t, S=S, K=K, r=r, t_max=t_max, S_max=S_max)
+
+		#Solve PDE
+		for i in reversed(range(1, len(t))):
+			for j in range(0, len(S)-1):
+				V[i-1, j] = (dt*r*S[j]/dS)*(V[i,j+1]-V[i,j]) + (dt*sigma**2*S[j]**2)/(2*dS**2)*(V[i,j+1]+V[i,j-1]-2*V[i,j]) - dt*r*V[i,j] + V[i,j]
+
+		return t, S, V
+
+
+	def toSeries(self, P):
+		"""
+		Convert the option price-time matrix to a time series given the price history data of the underlying MG.
+		P = price history data of the underlying MG
+		"""
+		return
 
 
 

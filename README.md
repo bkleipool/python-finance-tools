@@ -34,7 +34,9 @@ plt.plot(P[1], label='S2', color='red')
 plt.legend(), plt.show()
 ```
 Here, `P` are the price histories of the two MGs and `dP` are the differences in prices between each timestep.
-![](docs/S1-S2.png)
+
+<img src="docs/S1-S2.png" width="600" height="448">
+
 As you can see in the plot, the stocks show a strong co-movement due to the covariance.
 
 ### Simulating options
