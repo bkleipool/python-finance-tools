@@ -148,15 +148,30 @@ class MG():
 			raise TypeError
 
 
-	#TODO: implement MG*MG multiplication
+	##TODO: MG*MG multiplication not implemented
 	def __mul__(self, MG2):
 		#https://stats.stackexchange.com/questions/15978/variance-of-product-of-dependent-variables
 		#https://math.stackexchange.com/questions/2926888/find-operatornamecovx2-y2
 		#https://stats.stackexchange.com/questions/352110/prove-that-textcorrx2-y2-rho2-where-x-y-are-jointly-n0-1-variab
-		#https://mathhelpforum.com/t/how-to-get-the-covariance-of-x-and-x-cov-x-x.182125/
 
+		#https://stats.stackexchange.com/questions/15978/variance-of-product-of-dependent-variables/182822#182822
+		#https://math.stackexchange.com/questions/1915366/expected-value-of-product-of-square-of-random-variable
+		#https://en.wikipedia.org/wiki/Distribution_of_the_product_of_two_random_variables
+		#https://math.stackexchange.com/questions/2044833/need-help-to-get-covxy-z
 
 		if isinstance(MG2, MG):
+			"""
+			var = (MG2.sigma**2 - MG.cov_mat[self.id, MG2.id]**2/self.sigma**2)*(self.mu**2+self.sigma**2) \
+				+ (self.mu*MG2.mu+MG.cov_mat[self.id, MG2.id])**2 \
+				+ MG.cov_mat[self.id, MG2.id]**2/(self.sigma**2 * MG2.sigma**2) * (self.mu**4+6*self.mu**2*self.sigma**3+3*self.sigma**4)
+			cov1 = MG.covar(self.id)
+			cov2 = MG.covar(MG2.id)
+
+			return MG(state=self.state*MG2.state,
+					  mu=self.mu*MG2.mu + MG.cov_mat[self.id, MG2.id],
+					  sigma=np.sqrt((self.sigma**2+self.mu**2)*(MG2.sigma**2+MG2.mu**2)-(self.mu*MG2.mu)**2),
+					  cov=self.mu*cov1 + MG2.mu*cov2)
+			"""
 			raise NotImplementedError
 
 		elif isinstance(MG2, int) or isinstance(MG2, float):
@@ -190,12 +205,12 @@ class MG():
 				  sigma=self.sigma,
 				  cov=-MG.covar(self.id))
 
-	#TODO: implement covariance
+	##TODO: not implemented
 	def __abs__(self):
 		#https://en.wikipedia.org/wiki/Folded_normal_distribution
 		#https://stats.stackexchange.com/questions/89899/variance-of-absolute-value-of-a-rv
 		#https://mathhelpforum.com/t/how-to-get-the-covariance-of-x-and-x-cov-x-x.182125/
-
+		"""
 		mu_y = self.sigma*np.sqrt(2/np.pi) * np.exp(-self.mu**2/(2*self.sigma**2)) + self.mu*erf(self.mu/np.sqrt(2*self.sigma**2))
 		sigma_y = np.sqrt(self.mu**2 + self.sigma**2 - mu_y**2)
 
@@ -203,6 +218,10 @@ class MG():
 				  mu = mu_y,
 				  sigma = sigma_y)
 				  #cov = MG.covar(self.id))
+		"""
+		raise NotImplementedError
+
+
 
 
 #Time series class
@@ -230,30 +249,13 @@ class timeSeries():
 		return self.stateHist, self.deltaHist
 
 
+
+
 #option class
 class option():
-	def __init__(self, underlying, strike_price, risk_free_rate, t_max):
-		"""
-		Instantiate option object
-		und = underlying asset
-		K = strike price
-		r = risk-free interest rate
-		r_period = nr. of propegation steps per interest period
-		t_max = maturity date (in interest periods)
-		"""
-		self.K = strike_price
-		self.r = risk_free_rate
-		self.r_period = r_period
-		self.t_max = t_max
-
-		if isinstance(underlying, MG):
-			self.und = underlying
-		else:
-			raise Exception('Underlying must be of type MG')
-
-
-	@classmethod
-	def BlackScholes_Euro(r, K, sigma, t_max, S_max, N, M, bounds):
+	#Black-scholes PDE
+	@staticmethod
+	def BlackScholes(r, K, sigma, t_max, S_max, N, M, bounds):
 		"""
 		Calculates the option price according to the Black-Scholes PDE for European options, with the given parameters and boundary conditions.
 		r = risk-free interest rate
@@ -287,14 +289,147 @@ class option():
 
 		return t, S, V
 
+	#Boundary conditions
+	@staticmethod
+	def boundsCall(t, S, K, r, t_max, S_max, **kwargs):
+		"""
+		Lower, upper and maturity boundaries for a call option.
+		t = array of timesteps
+		S = array of stock prices
+		K = Strike price(s)
+		r = risk-free interest rate
+		t_max = Time till maturity (in interest periods)
+		S_max = Maximum considered stock price
+		"""
+		lbound = 0
+		ubound = S_max - K*np.exp(-r*(t_max-t))
+		matbound = np.maximum(S-K, 0)
+		return lbound, ubound, matbound
+
+	@staticmethod
+	def boundsPut(t, S, K, r, t_max, S_max, **kwargs):
+		"""
+		Lower, upper and maturity boundaries for a put option.
+		t = array of timesteps
+		S = array of stock prices
+		K = Strike price(s)
+		r = risk-free interest rate
+		t_max = Time till maturity (in interest periods)
+		S_max = Maximum considered stock price
+		"""
+		lbound = S_max - K*np.exp(-r*(t_max-t))
+		ubound = 0
+		matbound = np.maximum(K-S, 0)
+		return lbound, ubound, matbound
+
+	@staticmethod
+	def boundsButterfly(S, K, **kwargs):
+		"""
+		Lower, upper and maturity boundaries for a butterfly option.
+		S = array of stock prices
+		K = Strike price(s)
+		"""
+		lbound = 0
+		ubound = 0
+		matbound = np.minimum(np.maximum(S-K[0], 0), np.maximum(K[1]-S, 0))
+		return lbound, ubound, matbound
+
+	@staticmethod
+	def boundsStraddle(t, S, K, r, t_max, S_max, **kwargs):
+		"""
+		Lower, upper and maturity boundaries for a straddle option.
+		S = array of stock prices
+		K = Strike price(s)
+		"""
+		lbound = K
+		ubound = S_max - K*np.exp(-r*(t_max-t))
+		matbound = np.maximum(K-S, S-K)
+		return lbound, ubound, matbound
+
+	@staticmethod
+	def boundsStrangle(t, S, K, r, t_max, S_max, **kwargs):
+		"""
+		Lower, upper and maturity boundaries for a strangle option.
+		S = array of stock prices
+		K = Strike price(s)
+		"""
+		lbound = S_max - K[0]*np.exp(-r*(t_max-t))
+		ubound = S_max - K[1]*np.exp(-r*(t_max-t))
+		matbound = np.maximum(K[0]-S, np.maximum(S-K[1], 0))
+		return lbound, ubound, matbound
+
+	@staticmethod
+	def boundsCollar(S, K, **kwargs):
+		"""
+		Lower, upper and maturity boundaries for a collar option.
+		S = array of stock prices
+		K = Strike price(s)
+		"""
+		lbound = 0
+		ubound = K[1]-K[0]
+		matbound = np.minimum(np.maximum(S-K[0], 0), K[1]-K[0])
+		return lbound, ubound, matbound
+
+	@staticmethod
+	def boundsBackspread(t, S, K, r, t_max, S_max, **kwargs):
+		"""
+		Lower, upper and maturity boundaries for a backspread option.
+		S = array of stock prices
+		K = Strike price(s)
+		"""
+		lbound = K[0]
+		ubound = K[1]-K[0]
+		matbound = np.maximum(K[0]-S, np.minimum(S-K[0],K[1]-K[0]))
+		return lbound, ubound, matbound
+
+
+	def __init__(self, underlying, bounds):
+		"""
+		Instantiate option object
+		und = underlying asset
+		bounds = boundary conditions of the option
+		"""
+		self.bounds = bounds
+
+		if isinstance(underlying, MG):
+			self.und = underlying
+		else:
+			raise Exception('Underlying must be of type MG')
+
+
+	def pricing(self, r, K, r_period, t_max, S_max, N, M):
+		"""
+		Calculate prices for option object
+		K = strike price
+		r = risk-free interest rate
+		r_period = nr. of propegation steps per interest period
+		t_max = maturity date (in interest periods)
+		"""
+
+		##TODO: idk if self.und.sigma/np.sqrt(self.r_period) is entirely correct
+		self.r_period = r_period
+		self.t, self.S, self.V = option.BlackScholes(r=r, K=K, sigma=self.und.sigma/np.sqrt(self.r_period), t_max=t_max, S_max=S_max, N=N, M=M, bounds=self.bounds)
+
 
 	def toSeries(self, P):
 		"""
 		Convert the option price-time matrix to a time series given the price history data of the underlying MG.
 		P = price history data of the underlying MG
 		"""
-		return
+		V = np.delete(self.V, [i for i in range(len(self.t)) if i%int(len(self.V)/len(P)) != 0], axis=0)
+		t = np.delete(self.t, [i for i in range(len(self.t)) if i%int(len(self.t)/len(P)) != 0])
 
+
+		print(len(V), len(t), len(P))
+
+		S_indices = [np.argmin(np.abs(self.S-np.full(len(self.S), x))) for x in P]
+		V_prices = [V[i,j] for i,j in zip(range(len(t)), S_indices)]
+
+
+		#ax1.plot(X, Stock.price, label='stock', color='black')
+		#ax2.plot(X, V_prices, label='option', color='red')
+
+		return P[S_indices] #V_prices
 
 
 
@@ -302,25 +437,28 @@ class option():
 if __name__ == '__main__':
 	import matplotlib.pyplot as plt
 
-
-	S1 = MG(state=0, mu=0.001, sigma=0.3)
-	S2 = MG(state=2, mu=0.005, sigma=0.4, cov={S1.id:0.035})
-	#print(MG.cov_mat)
-
-
-	S = timeSeries((S1, S2, S2-S1))
-	#print(MG.cov_mat)
+	#define MGs
+	S1 = MG(state=36, mu=0.001, sigma=0.271)
+	S2 = MG(state=45, mu=0.002, sigma=0.48, cov={S1.id:0.015})
 
 
-	P, dP = S.propegate(N=150)
-
+	#define timeseries
+	TS = timeSeries((S1, S2))
+	P, dP = TS.propegate(N=150)
+	"""
 	plt.plot(P[0], label='S1', linestyle='--')
 	plt.plot(P[1], label='S2', linestyle='--')
-	plt.plot(P[2], label='S2-S1', color='black')
-
+	
 	plt.legend(), plt.show()
+	"""
 
+	#define option
+	Opt = option(S1, bounds=option.boundsPut)
+	Opt.pricing(r=0.015, K=65, r_period=150, t_max=1, S_max=130, N=3000, M=100)
 
-
+	V = Opt.toSeries(P[0])
+	plt.plot(P[0], label='P')
+	plt.plot(V, label='V')
+	plt.show()
 
 

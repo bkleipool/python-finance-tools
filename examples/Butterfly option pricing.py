@@ -1,8 +1,8 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from options.black_scholes import BlackScholes_Euro, boundsPut, boundsButterfly, boundsCollar, boundsBackspread, boundsStrangle
-from stocks.gaussian_copula import stock
+from pyfinancetools.black_scholes import BlackScholes_Euro, boundsPut, boundsButterfly, boundsCollar, boundsBackspread, boundsStrangle
+from pyfinancetools.gaussian_copula import stock
 
 
 
@@ -16,11 +16,11 @@ Stock.summary()
 
 #option
 K = 75 #[70, 80]
-t, S, V = BlackScholes_Euro(r=0.015, K=K, sigma=0.29649152648, t_max=1.0, S_max=150, N=12000, M=100, bounds=boundsPut)
+t, S, V = BlackScholes_Euro(r=0.015, K=K, sigma=1.89649152648/np.sqrt(N), t_max=1.0, S_max=150, N=12000, M=100, bounds=boundsPut)
 V = np.delete(V, [i for i in range(len(t)) if i%120 != 0], axis=0)
 t = np.delete(t, [i for i in range(len(t)) if i%120 != 0])
 
-
+print(1.89649152648/np.sqrt(N))
 
 """
 fig, (ax1, ax2) = plt.subplots(2, sharex=True)
@@ -49,8 +49,9 @@ plt.tight_layout()
 ax1.legend(), ax2.legend(), plt.show()
 
 
-
+"""
 plt.plot(X, Stock.price, label='stock', color='black')
 plt.plot(X, 9*np.array(V_prices), label='option', color='red')
 plt.plot(X, (np.array(Stock.price)+9*np.array(V_prices))/2, label='portfolio', color='gray')
 plt.legend(), plt.show()
+"""
