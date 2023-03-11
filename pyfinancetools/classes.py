@@ -2,7 +2,7 @@ import numpy as np
 from math import erf
 
 
-#Gaussian martingale class
+#Martingale class
 class MG():
 	inst = 0
 	cov_mat = []
@@ -232,6 +232,7 @@ class timeSeries():
 		deltaHist = history of differences of states
 		propegator = propegation function
 		"""
+
 		self.MGs = MGs
 		self.init_state = [i.state for i in self.MGs] if init_state == None else init_state
 		self.ids = [i.id for i in self.MGs]
@@ -239,7 +240,7 @@ class timeSeries():
 		self.cov = MG.cov_mat[np.ix_(self.ids, self.ids)] #select rows & columns from MG.cov_mat
 
 
-	def propegate(self, N=1):
+	def propagate(self, N=1):
 		self.stateHist = np.zeros((len(self.init_state),N+1))
 		self.deltaHist = np.zeros((len(self.init_state),1))
 
@@ -416,11 +417,14 @@ class option():
 		Convert the option price-time matrix to a time series given the price history data of the underlying MG.
 		P = price history data of the underlying MG
 		"""
-		V = np.delete(self.V, [i for i in range(len(self.t)) if i%int(len(self.V)/len(P)) != 0], axis=0)
-		t = np.delete(self.t, [i for i in range(len(self.t)) if i%int(len(self.t)/len(P)) != 0])
+		#V = np.delete(self.V, [i for i in range(len(self.t)) if i%int(len(self.V)/len(P)) != 0], axis=0)
+		#t = np.delete(self.t, [i for i in range(len(self.t)) if i%int(len(self.t)/len(P)) != 0])
 
+		T = np.linspace(0, len(P)/self.r_period, len(P)) #time steps in original time series
+		t = [self.t[np.argmin(np.abs(self.t-np.full(len(self.t), x)))] for x in T]
 
-		print(len(V), len(t), len(P))
+		print(P)
+		print(t)
 
 		S_indices = [np.argmin(np.abs(self.S-np.full(len(self.S), x))) for x in P]
 		V_prices = [V[i,j] for i,j in zip(range(len(t)), S_indices)]
@@ -434,22 +438,106 @@ class option():
 
 
 
+#Portfolio selection
+def Markowitz_minrisk(MGs, cap=None, weights=False):
+	"""
+	Returns the minimum volatility portfolio on the efficient frontier.
+	MGs = Arrray of available stocks
+	cap = Starting capital (optional)
+	weights = Wether or not to return the portfolio or simply the weights
+	returns: w = portfolio OR portfolio weights vector
+	"""
+	#calculate covariance matrix
+	ids = np.array([i.id for i in MGs])
+	states = np.array([i.state for i in MGs])
+	cov = MG.cov_mat[np.ix_(ids, ids)]
+
+	#normalise cov matrix
+	cov_n = np.multiply(np.array([1/states]).T*(1/states), cov)
+
+	one = np.ones(len(MGs))
+	covi = np.linalg.inv(cov_n)
+	C = one @ covi @ one
+
+	w = 1/C*(covi @ one)
+	if cap != None:
+		w = cap * w/(w @ states)
+
+	if weights:
+		return w
+	else:
+		return w @ MGs
+
+
+def Markowitz_ef(MGs, mu, cap=None, weights=False):
+	"""
+	Returns the portfolio on the efficient frontier with a given target return mu.
+	MGs = Arrray of available stocks
+	mu = target return percentage (per propegation step)
+	cap = Starting capital (optional)
+
+	weights = Wether or not to return the portfolio or simply the weights
+	returns: w = portfolio OR portfolio weights vector
+	"""
+
+	#calculate values
+	ids = np.array([i.id for i in MGs])
+	states = np.array([i.state for i in MGs])
+	cov = MG.cov_mat[np.ix_(ids, ids)]
+	MU = np.array([i.mu for i in MGs])
+
+	#normalise values
+	MU_n = MU*(1/states)
+	cov_n = np.multiply(np.array([1/states]).T*(1/states), cov)
+
+	one = np.ones(len(MGs))
+	covi = np.linalg.inv(cov)
+	A = MU_n @ covi @ MU_n
+	B = MU_n @ covi @ one
+	C = one @ covi @ one
+
+	w = (mu*C-B)/(A*C-B**2)*(covi @ MU_n) + (A-mu*B)/(A*C-B**2)*(covi @ one)
+	if cap != None:
+		w = cap * w/(w @ states)
+
+	if weights:
+		return w
+	else:
+		return w @ MGs
+
+
+
+
+
 if __name__ == '__main__':
 	import matplotlib.pyplot as plt
 
 	#define MGs
-	S1 = MG(state=36, mu=0.001, sigma=0.271)
-	S2 = MG(state=45, mu=0.002, sigma=0.48, cov={S1.id:0.015})
+	S1 = MG(state=36, mu=0.035*(36/365), sigma=0.24)
+	S2 = MG(state=45, mu=0.09*(45/365), sigma=0.48, cov={S1.id:0.011})
+	S3 = MG(state=51, mu=0.10*(51/365), sigma=0.68, cov={S2.id:-0.016})
+	#S4 = MG(state=48, mu=0.07*(48/365), sigma=0.38, cov={S2.id:0.012, S3.id:0.012})
 
+
+	print(Markowitz_ef((S1, S2, S3), mu=0.075/365, weights=True))
+	Pf = Markowitz_ef((S1, S2, S3), cap=5000, mu=0.075/365) 
 
 	#define timeseries
-	TS = timeSeries((S1, S2))
-	P, dP = TS.propegate(N=150)
-	"""
-	plt.plot(P[0], label='S1', linestyle='--')
-	plt.plot(P[1], label='S2', linestyle='--')
+	TS = timeSeries((S1, S2, S3, Pf))
+	P, dP = TS.propagate(N=365)
+
+	#print((P[4,-1]-P[4,0])/P[4,0])
 	
-	plt.legend(), plt.show()
+	#plot
+	fig, (ax1, ax2) = plt.subplots(2, sharex=True)
+	ax1.plot(P[0], label='S1', linestyle='--', linewidth=1)
+	ax1.plot(P[1], label='S2', linestyle='--', linewidth=1)
+	ax1.plot(P[2], label='S3', linestyle='--', linewidth=1)
+	#ax1.plot(P[3], label='S4', linestyle='--', linewidth=1)
+	ax2.plot(P[3], label='Portfolio', color='black')
+	plt.tight_layout(), ax1.legend(), ax2.legend(), plt.show()
+
+
 	"""
 
 	#define option
@@ -460,5 +548,5 @@ if __name__ == '__main__':
 	plt.plot(P[0], label='P')
 	plt.plot(V, label='V')
 	plt.show()
-
+	"""
 
