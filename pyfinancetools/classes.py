@@ -254,6 +254,15 @@ class timeSeries():
 
 #option class
 class option():
+
+	#TODO: not implemented
+	@staticmethod
+	def MonteCarlo(self):
+		#https://web.archive.org/web/20100318060412/http://www.puc-rio.br/marco.ind/monte-carlo.html#mc-eur
+		#https://en.wikipedia.org/wiki/Monte_Carlo_methods_for_option_pricing
+		#https://en.wikipedia.org/wiki/Monte_Carlo_methods_in_finance
+		return NotImplementedError
+
 	#Black-scholes PDE
 	@staticmethod
 	def BlackScholes(r, K, sigma, t_max, S_max, N, M, bounds):
@@ -289,6 +298,8 @@ class option():
 				V[i-1, j] = (dt*r*S[j]/dS)*(V[i,j+1]-V[i,j]) + (dt*sigma**2*S[j]**2)/(2*dS**2)*(V[i,j+1]+V[i,j-1]-2*V[i,j]) - dt*r*V[i,j] + V[i,j]
 
 		return t, S, V
+
+
 
 	#Boundary conditions
 	@staticmethod
@@ -417,23 +428,16 @@ class option():
 		Convert the option price-time matrix to a time series given the price history data of the underlying MG.
 		P = price history data of the underlying MG
 		"""
-		#V = np.delete(self.V, [i for i in range(len(self.t)) if i%int(len(self.V)/len(P)) != 0], axis=0)
-		#t = np.delete(self.t, [i for i in range(len(self.t)) if i%int(len(self.t)/len(P)) != 0])
-
+		#Compress timesteps of time-price matrix to match price data
 		T = np.linspace(0, len(P)/self.r_period, len(P)) #time steps in original time series
 		t = [self.t[np.argmin(np.abs(self.t-np.full(len(self.t), x)))] for x in T]
+		V = np.array([self.V[np.argmin(np.abs(self.t-np.full(len(self.t), x)))] for x in T])
 
-		print(P)
-		print(t)
-
+		#Sample from time-price matrix (select closest points to price data)
 		S_indices = [np.argmin(np.abs(self.S-np.full(len(self.S), x))) for x in P]
 		V_prices = [V[i,j] for i,j in zip(range(len(t)), S_indices)]
 
-
-		#ax1.plot(X, Stock.price, label='stock', color='black')
-		#ax2.plot(X, V_prices, label='option', color='red')
-
-		return P[S_indices] #V_prices
+		return V_prices
 
 
 
@@ -513,40 +517,48 @@ if __name__ == '__main__':
 	import matplotlib.pyplot as plt
 
 	#define MGs
-	S1 = MG(state=36, mu=0.035*(36/365), sigma=0.24)
-	S2 = MG(state=45, mu=0.09*(45/365), sigma=0.48, cov={S1.id:0.011})
-	S3 = MG(state=51, mu=0.10*(51/365), sigma=0.68, cov={S2.id:-0.016})
-	#S4 = MG(state=48, mu=0.07*(48/365), sigma=0.38, cov={S2.id:0.012, S3.id:0.012})
+	S1 = MG(state=36, mu=0.035*(36/365), sigma=0.34)
+	S2 = MG(state=45, mu=0.09*(45/365), sigma=0.88, cov={S1.id:0.011})
+	S3 = MG(state=51, mu=0.10*(51/365), sigma=1.18, cov={S2.id:-0.016})
+	S4 = MG(state=48, mu=0.07*(48/365), sigma=0.88, cov={S2.id:0.012, S3.id:0.012})
 
 
-	print(Markowitz_ef((S1, S2, S3), mu=0.075/365, weights=True))
-	Pf = Markowitz_ef((S1, S2, S3), cap=5000, mu=0.075/365) 
+	print(Markowitz_ef((S1, S2, S3, S4), mu=0.075/365, weights=True))
+	Pf = Markowitz_ef((S1, S2, S3, S4), cap=5000, mu=0.075/365) 
 
 	#define timeseries
-	TS = timeSeries((S1, S2, S3, Pf))
-	P, dP = TS.propagate(N=365)
+	TS = timeSeries((S1, S2, S3, S4, Pf))
+	P, dP = TS.propagate(N=150)
 
-	#print((P[4,-1]-P[4,0])/P[4,0])
 	
 	#plot
+	"""
 	fig, (ax1, ax2) = plt.subplots(2, sharex=True)
 	ax1.plot(P[0], label='S1', linestyle='--', linewidth=1)
 	ax1.plot(P[1], label='S2', linestyle='--', linewidth=1)
 	ax1.plot(P[2], label='S3', linestyle='--', linewidth=1)
-	#ax1.plot(P[3], label='S4', linestyle='--', linewidth=1)
-	ax2.plot(P[3], label='Portfolio', color='black')
+	ax1.plot(P[3], label='S4', linestyle='--', linewidth=1)
+	ax2.plot(P[4], label='Portfolio', color='black')
 	plt.tight_layout(), ax1.legend(), ax2.legend(), plt.show()
-
-
 	"""
 
 	#define option
-	Opt = option(S1, bounds=option.boundsPut)
-	Opt.pricing(r=0.015, K=65, r_period=150, t_max=1, S_max=130, N=3000, M=100)
+	S1 = MG(state=1, mu=0, sigma=0.025)
+	TS = timeSeries([S1])
+	P, dP = TS.propagate(N=150)
+
+
+	Opt = option(S1, bounds=option.boundsBackspread)
+	Opt.pricing(r=0.015, K=[0.85, 1.15], r_period=150, t_max=3, S_max=3, N=3000, M=150)
+
+	plt.plot(Opt.S, Opt.V[-1], color='black', label='maturity price')
+	plt.plot(Opt.S, Opt.V[0], color='red', label='init price')
+	plt.tight_layout(), plt.legend(), plt.show()
+
 
 	V = Opt.toSeries(P[0])
+
 	plt.plot(P[0], label='P')
 	plt.plot(V, label='V')
-	plt.show()
-	"""
+	#plt.tight_layout(), plt.legend(), plt.show()
 
