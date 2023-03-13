@@ -1,5 +1,5 @@
-from .classes import MG
-from .classes import timeSeries
-from .classes import option
-from .classes import Delta
-from .classes import Markowitz_minrisk, Markowitz_ef
+from .portfolio import MG
+from .portfolio import Markowitz_minrisk, Markowitz_ef
+from .timeseries import timeSeries
+from .option import option
+from .option import Delta
