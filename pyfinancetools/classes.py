@@ -510,6 +510,50 @@ def Markowitz_ef(MGs, mu, cap=None, weights=False):
 		return w @ MGs
 
 
+#Greeks
+def Delta(und, der, undMG=None):
+	"""
+	Finds the first order partial derivative of the option price V w.r.t. the stock price S.
+	und = Underlying asset (array of stock prices OR MG object)
+	der = Derived asset (Option object OR MG object)
+	undMG = MG corresponding to the price history of `und' (optional, assumed underlying asset of option if empty)
+	"""
+
+	#Find delta between MGs from cov matrix
+	if isinstance(und, MG) and isinstance(der, MG):
+		return MG.cov_mat[und.id, der.id] / (und.sigma * der.sigma)
+
+	#Find delta between option and underlying (price-time matrix + price history)
+	elif isinstance(und, np.ndarray) and isinstance(der, option) and undMG == None:
+
+		#Same procedure as option.toSeries()
+		T = np.linspace(0, len(und)/der.r_period, len(und)) #time steps in original time series
+		t = [der.t[np.argmin(np.abs(der.t-np.full(len(der.t), x)))] for x in T]
+		V = np.array([der.V[np.argmin(np.abs(der.t-np.full(len(der.t), x)))] for x in T])
+
+		dS = max(und)/len(und)
+		dV = np.diff(V)
+		dV = np.column_stack((dV[:,0], dV))
+
+		S_indices = [np.argmin(np.abs(der.S-np.full(len(der.S), x))) for x in und]
+		Delta = [dV[i,j]/dS for i,j in zip(range(len(t)), S_indices)]
+
+		return Delta
+
+	elif not isinstance(und, np.ndarray) and not isinstance(und, MG):
+		TypeError("Underlying must be of type 'MG' or a numpy array")
+	elif not isinstance(der, option) and not isinstance(der, MG):
+		TypeError("Derived must be of type 'option' or 'MG'")
+	#elif not isinstance(undMG, MG):
+		#TypeError("undMG parameter must be of type 'MG' or None")
+
+	elif isinstance(der, option) and not isinstance(und, np.ndarray):
+		TypeError("For a derived of type 'option', underlying must be a numpy array")
+	elif isinstance(der, MG) and not isinstance(und, MG):
+		TypeError("For a derived of type 'MG', underlying must be of type 'MG'")
+	#elif isinstance(der, MG) and not isinstance(undMG, type(None)):
+		#TypeError("For a derived of type 'MG', undMG paramter may not be used")
+
 
 
 
@@ -517,12 +561,12 @@ if __name__ == '__main__':
 	import matplotlib.pyplot as plt
 
 	#define MGs
-	S1 = MG(state=36, mu=0.035*(36/365), sigma=0.34)
+	S1 = MG(state=36, mu=0.015*(36/365), sigma=0.24)
 	S2 = MG(state=45, mu=0.09*(45/365), sigma=0.88, cov={S1.id:0.011})
 	S3 = MG(state=51, mu=0.10*(51/365), sigma=1.18, cov={S2.id:-0.016})
-	S4 = MG(state=48, mu=0.07*(48/365), sigma=0.88, cov={S2.id:0.012, S3.id:0.012})
+	S4 = MG(state=48, mu=0.07*(48/365), sigma=0.88, cov={S2.id:0.012, S3.id:0.014})
 
-
+	#define portfolio
 	print(Markowitz_ef((S1, S2, S3, S4), mu=0.075/365, weights=True))
 	Pf = Markowitz_ef((S1, S2, S3, S4), cap=5000, mu=0.075/365) 
 
@@ -530,9 +574,7 @@ if __name__ == '__main__':
 	TS = timeSeries((S1, S2, S3, S4, Pf))
 	P, dP = TS.propagate(N=150)
 
-	
 	#plot
-	"""
 	fig, (ax1, ax2) = plt.subplots(2, sharex=True)
 	ax1.plot(P[0], label='S1', linestyle='--', linewidth=1)
 	ax1.plot(P[1], label='S2', linestyle='--', linewidth=1)
@@ -540,25 +582,4 @@ if __name__ == '__main__':
 	ax1.plot(P[3], label='S4', linestyle='--', linewidth=1)
 	ax2.plot(P[4], label='Portfolio', color='black')
 	plt.tight_layout(), ax1.legend(), ax2.legend(), plt.show()
-	"""
-
-	#define option
-	S1 = MG(state=1, mu=0, sigma=0.025)
-	TS = timeSeries([S1])
-	P, dP = TS.propagate(N=150)
-
-
-	Opt = option(S1, bounds=option.boundsBackspread)
-	Opt.pricing(r=0.015, K=[0.85, 1.15], r_period=150, t_max=3, S_max=3, N=3000, M=150)
-
-	plt.plot(Opt.S, Opt.V[-1], color='black', label='maturity price')
-	plt.plot(Opt.S, Opt.V[0], color='red', label='init price')
-	plt.tight_layout(), plt.legend(), plt.show()
-
-
-	V = Opt.toSeries(P[0])
-
-	plt.plot(P[0], label='P')
-	plt.plot(V, label='V')
-	#plt.tight_layout(), plt.legend(), plt.show()
 
